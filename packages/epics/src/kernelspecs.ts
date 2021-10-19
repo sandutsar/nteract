@@ -5,6 +5,7 @@ import { ofType } from "redux-observable";
 import { kernelspecs } from "rx-jupyter";
 import { EMPTY, Observable, of } from "rxjs";
 import { catchError, map, mergeMap } from "rxjs/operators";
+import { Map, List } from "immutable";
 
 export const fetchKernelspecsEpic = (
   action$: Observable<actions.FetchKernelspecs>,
@@ -33,13 +34,13 @@ export const fetchKernelspecsEpic = (
             const value = data.response.kernelspecs[key];
             kernelspecs[key] = {
               name: value.name,
-              resources: value.resources,
-              argv: value.spec.argv,
+              resources: Map(value.resources),
+              argv: List(value.spec.argv),
               displayName: value.spec.display_name,
-              env: value.spec.env,
+              env: Map(value.spec.env),
               interruptMode: value.spec.interrupt_mode,
               language: value.spec.language,
-              metadata: value.spec.metadata
+              metadata: Map(value.spec.metadata)
             };
           });
           return actions.fetchKernelspecsFulfilled({

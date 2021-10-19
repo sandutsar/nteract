@@ -19,7 +19,7 @@ import * as terminals from "./terminals";
  */
 export const apiVersion = (
   serverConfig: ServerConfig
-): Observable<AjaxResponse> => ajax(createAJAXSettings(serverConfig, "/api"));
+): Observable<AjaxResponse<{ version: string}>> => ajax(createAJAXSettings(serverConfig, "/api"));
 
 /**
  * Creates an AjaxObservable for shutting down a notebook server.
@@ -30,7 +30,7 @@ export const apiVersion = (
  */
 export const shutdown = (
   serverConfig: ServerConfig
-): Observable<AjaxResponse> =>
+): Observable<AjaxResponse<void>> =>
   ajax(createAJAXSettings(serverConfig, "/api/shutdown", { method: "POST" }));
 
 export { kernels, kernelspecs, sessions, bookstore, contents, terminals };

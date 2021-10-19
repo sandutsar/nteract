@@ -72,7 +72,7 @@ export const launchWebSocketKernelEpic = (
           const sessionId = castToSessionId(session.id);
 
           const kernel: RemoteKernelProps = Object.assign({}, session.kernel, {
-            type: "websocket",
+            type: "websocket" as const,
             info: null,
             sessionId,
             cwd,
@@ -169,7 +169,7 @@ export const changeWebSocketKernelEpic = (
                 {},
                 session.kernel,
                 {
-                  type: "websocket",
+                  type: "websocket" as const,
                   sessionId,
                   cwd,
                   channels: kernels.connect(
@@ -437,7 +437,7 @@ export const restartWebSocketKernelEpic = (
       const id = kernel.id;
 
       return kernels.restart(serverConfig, id).pipe(
-        mergeMap((response: AjaxResponse) => {
+        mergeMap((response) => {
           if (response.status !== 200) {
             return of(
               actions.restartKernelFailed({

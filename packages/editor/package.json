@@ -21,7 +21,7 @@
     "@nteract/messaging": "^7.0.19",
     "@nteract/outputs": "^3.0.11",
     "codemirror": "5.61.1",
-    "rxjs": "^6.3.3"
+    "rxjs": "7.4.0"
   },
   "peerDependencies": {
     "immutable": "^4.0.0-rc.12",

@@ -1,6 +1,6 @@
 /** tslint:disable:jsdoc-format */
 import Cookies from "js-cookie";
-import { AjaxRequest, AjaxResponse } from "rxjs/ajax";
+import { AjaxConfig, AjaxRequest } from "rxjs/ajax";
 import { ServerConfig } from "@nteract/types";
 
 export const normalizeBaseURL = (url = "") => url.replace(/\/+$/, "");
@@ -19,7 +19,7 @@ export const createAJAXSettings = (
   serverConfig: ServerConfig,
   uri = "/",
   opts: Partial<AjaxRequest & { cache?: boolean }> = {}
-): AjaxRequest => {
+): AjaxConfig => {
   const baseURL = normalizeBaseURL(serverConfig.endpoint || serverConfig.url);
   let url = `${baseURL}${uri}`;
   if (opts.cache === false) {
@@ -39,7 +39,7 @@ export const createAJAXSettings = (
 
   // Merge in our typical settings for responseType, allow setting additional
   // options like the method
-  const settings = {
+  const settings: AjaxConfig & Partial<ServerConfig> & { cache?: boolean } = {
     url,
     responseType: "json",
     createXHR: () => new XMLHttpRequest(),
@@ -57,25 +57,3 @@ export const createAJAXSettings = (
   delete settings.cache;
   return settings;
 };
-
-/**
- * RxJS's AjaxResponse sets `response` as any when we can declare the type returned.
- *
- * This interface is meant to be internal, used as:
- *
- * ```
-   ajax('/api/contents') as Observable<JupyterAjaxResponse<Contents>>
-   ```
- * or as
- * ```
-   ajax('/api/contents').map(resp => {
-     if(resp.response.type === "notebook")
-   })
-   ```
- *
- * NOTE: the response can still be invalid and should likely be validated
- */
-export interface JupyterAjaxResponse<ResponseType, ErrorType = string>
-  extends AjaxResponse {
-  response: ResponseType | ErrorType;
-}

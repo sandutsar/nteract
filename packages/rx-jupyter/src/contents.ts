@@ -3,8 +3,14 @@ import { Observable } from "rxjs";
 import { ajax, AjaxResponse } from "rxjs/ajax";
 import urljoin from "url-join";
 import { ServerConfig, IGetParams, IContent, FileType, IContentProvider } from "@nteract/types";
-import { createAJAXSettings, JupyterAjaxResponse } from "./base";
+import { createAJAXSettings } from "./base";
 import { mergeMap } from "rxjs/operators";
+
+export interface CheckpointResponse
+{
+  id: string;
+  last_modified: string;
+}
 
 const formURI = (path: string) => urljoin("/api/contents/", path);
 
@@ -24,7 +30,7 @@ const formCheckpointURI = (path: string, checkpointID: string) =>
  * @returns An Observable with the request response
  */
 export const remove = (serverConfig: ServerConfig, path: string) =>
-  ajax(
+  ajax<void>(
     createAJAXSettings(serverConfig, formURI(path), {
       method: "DELETE"
     })
@@ -57,7 +63,7 @@ export function get(
   // Then the response is IEmptyContent
   return ajax(
     createAJAXSettings(serverConfig, uri, { cache: false })
-  ) as Observable<JupyterAjaxResponse<IContent<FileType>>>;
+  ) as Observable<AjaxResponse<IContent<FileType>>>;
 }
 
 /**
@@ -74,7 +80,7 @@ export function update<FT extends FileType>(
   path: string,
   model: Partial<IContent<FT>>
 ) {
-  return ajax(
+  return ajax<IContent<FT>>(
     createAJAXSettings(serverConfig, formURI(path), {
       body: model,
       headers: {
@@ -98,8 +104,8 @@ export function create<FT extends FileType>(
   serverConfig: ServerConfig,
   path: string,
   model: Partial<IContent<FT>> & { type: FT }
-): Observable<AjaxResponse> {
-  return ajax(
+) {
+  return ajax<IContent<FT>>(
     createAJAXSettings(serverConfig, formURI(path), {
       body: model,
       headers: {
@@ -125,7 +131,7 @@ export function save<FT extends FileType>(
   path: string,
   model: Partial<IContent<FT>>
 ) {
-  return ajax(
+  return ajax<IContent<FT>>(
     createAJAXSettings(serverConfig, formURI(path), {
       body: model,
       headers: {
@@ -133,9 +139,7 @@ export function save<FT extends FileType>(
       },
       method: "PUT"
     })
-  ) as Observable<
-    JupyterAjaxResponse<{ path: string; [property: string]: string }>
-  >;
+  );
 }
 
 /**
@@ -147,7 +151,7 @@ export function save<FT extends FileType>(
  * @returns An Observable with the request response
  */
 export const listCheckpoints = (serverConfig: ServerConfig, path: string) =>
-  ajax(
+  ajax<Array<CheckpointResponse>>(
     createAJAXSettings(serverConfig, formCheckpointURI(path, ""), {
       cache: false,
       method: "GET"
@@ -165,7 +169,7 @@ export const listCheckpoints = (serverConfig: ServerConfig, path: string) =>
  * @returns An Observable with the request response
  */
 export const createCheckpoint = (serverConfig: ServerConfig, path: string) =>
-  ajax(
+  ajax<CheckpointResponse>(
     createAJAXSettings(serverConfig, formCheckpointURI(path, ""), {
       method: "POST"
     })
@@ -185,7 +189,7 @@ export const deleteCheckpoint = (
   path: string,
   checkpointID: string
 ) =>
-  ajax(
+  ajax<void>(
     createAJAXSettings(serverConfig, formCheckpointURI(path, checkpointID), {
       method: "DELETE"
     })
@@ -205,7 +209,7 @@ export const restoreFromCheckpoint = (
   path: string,
   checkpointID: string
 ) =>
-  ajax(
+  ajax<void>(
     createAJAXSettings(serverConfig, formCheckpointURI(path, checkpointID), {
       method: "POST"
     })
@@ -234,11 +238,7 @@ export const JupyterContentProvider: IContentProvider = {
   save<FT extends FileType>(serverConfig: ServerConfig, path: string, model: Partial<IContent<FT>>) {
     return save(serverConfig, path, model)
       .pipe(
-        mergeMap(async (saveXhr: AjaxResponse) => {
-          if (saveXhr.response.errno) {
-            return saveXhr;
-          }
-
+        mergeMap(async (saveXhr: AjaxResponse<IContent<FT>>) => {
           const pollIntervalMs = 500;
           const maxPollNb = 4;
 
@@ -247,8 +247,9 @@ export const JupyterContentProvider: IContentProvider = {
           // Check last-modified until value is stable.
           for (let i = 0; i < maxPollNb; ++i) {
             await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-            const getXhr: AjaxResponse = await get(serverConfig, path, { content: 0 }).toPromise();
+            const getXhr = await get(serverConfig, path, { content: 0 }).toPromise();
             if (
+              getXhr != null &&
               getXhr.status === 200 &&
               typeof getXhr.response !== "string" &&
               getXhr.response.last_modified &&

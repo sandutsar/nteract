@@ -2,6 +2,16 @@ import { Observable } from "rxjs";
 import { ajax, AjaxResponse } from "rxjs/ajax";
 import { ServerConfig } from "@nteract/types";
 import { createAJAXSettings } from "./base";
+import { KernelResponse } from "./kernels";
+
+export interface SessionResponse
+{
+  id: string;
+  path: string;
+  name: string;
+  type: string;
+  kernel: KernelResponse;
+}
 
 /**
  * Creates an AjaxObservable for listing available sessions.
@@ -11,8 +21,8 @@ import { createAJAXSettings } from "./base";
  *
  * @returns An Observable with the request response
  */
-export const list = (serverConfig: ServerConfig): Observable<AjaxResponse> =>
-  ajax(createAJAXSettings(serverConfig, "/api/sessions", { cache: false }));
+export const list = (serverConfig: ServerConfig) =>
+  ajax<Array<SessionResponse>>(createAJAXSettings(serverConfig, "/api/sessions", { cache: false }));
 
 /**
  * Creates an AjaxObservable for getting a particular session's information.
@@ -25,8 +35,8 @@ export const list = (serverConfig: ServerConfig): Observable<AjaxResponse> =>
 export const get = (
   serverConfig: ServerConfig,
   sessionID: string
-): Observable<AjaxResponse> =>
-  ajax(
+) =>
+  ajax<SessionResponse>(
     createAJAXSettings(serverConfig, `/api/sessions/${sessionID}`, {
       cache: false
     })
@@ -43,8 +53,8 @@ export const get = (
 export const destroy = (
   serverConfig: ServerConfig,
   sessionID: string
-): Observable<AjaxResponse> =>
-  ajax(
+) =>
+  ajax<void>(
     createAJAXSettings(serverConfig, `/api/sessions/${sessionID}`, {
       method: "DELETE"
     })
@@ -64,8 +74,8 @@ export const update = (
   serverConfig: ServerConfig,
   sessionID: string,
   body: object
-): Observable<AjaxResponse> =>
-  ajax(
+) =>
+  ajax<SessionResponse>(
     createAJAXSettings(serverConfig, `/api/sessions/${sessionID}`, {
       method: "PATCH",
       headers: {
@@ -87,8 +97,8 @@ export const update = (
 export const create = (
   serverConfig: ServerConfig,
   body: object
-): Observable<AjaxResponse> =>
-  ajax(
+) =>
+  ajax<SessionResponse>(
     createAJAXSettings(serverConfig, "/api/sessions", {
       method: "POST",
       headers: {

@@ -59,17 +59,22 @@ export interface IEmptyContent<FT extends FileType = FileType>
   content: null;
 }
 
+export interface ICheckpoint {
+  id: string;
+  last_modified: string;
+}
+
 /**
  * Standardized interface to model operations supported by contents API
  */
 export interface IContentProvider {
-  remove(serverConfig: ServerConfig, path: string): Observable<AjaxResponse>;
-  get(serverConfig: ServerConfig, path: string, params: Partial<IGetParams>): Observable<AjaxResponse>;
-  update<FT extends FileType>(serverConfig: ServerConfig, path: string, model: Partial<IContent<FT>>): Observable<AjaxResponse>;
-  create<FT extends FileType>(serverConfig: ServerConfig, path: string, model: Partial<IContent<FT>> & { type: FT }): Observable<AjaxResponse>;
-  save<FT extends FileType>(serverConfig: ServerConfig, path: string, model: Partial<IContent<FT>>): Observable<AjaxResponse>;
-  listCheckpoints(serverConfig: ServerConfig, path: string): Observable<AjaxResponse>;
-  createCheckpoint(serverConfig: ServerConfig, path: string): Observable<AjaxResponse>;
-  deleteCheckpoint(serverConfig: ServerConfig, path: string, checkpointID: string): Observable<AjaxResponse>;
-  restoreFromCheckpoint(serverConfig: ServerConfig, path: string, checkpointID: string): Observable<AjaxResponse>;
+  remove(serverConfig: ServerConfig, path: string): Observable<AjaxResponse<void>>;
+  get(serverConfig: ServerConfig, path: string, params: Partial<IGetParams>): Observable<AjaxResponse<IContent>>;
+  update<FT extends FileType>(serverConfig: ServerConfig, path: string, model: Partial<IContent<FT>>): Observable<AjaxResponse<IContent>>;
+  create<FT extends FileType>(serverConfig: ServerConfig, path: string, model: Partial<IContent<FT>> & { type: FT }): Observable<AjaxResponse<IContent>>;
+  save<FT extends FileType>(serverConfig: ServerConfig, path: string, model: Partial<IContent<FT>>): Observable<AjaxResponse<IContent>>;
+  listCheckpoints(serverConfig: ServerConfig, path: string): Observable<AjaxResponse<ICheckpoint[]>>;
+  createCheckpoint(serverConfig: ServerConfig, path: string): Observable<AjaxResponse<ICheckpoint>>;
+  deleteCheckpoint(serverConfig: ServerConfig, path: string, checkpointID: string): Observable<AjaxResponse<void>>;
+  restoreFromCheckpoint(serverConfig: ServerConfig, path: string, checkpointID: string): Observable<AjaxResponse<void>>;
 }

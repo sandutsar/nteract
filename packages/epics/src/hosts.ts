@@ -74,12 +74,12 @@ export function publishToBookstore(
           type: "notebook"
         })
         .pipe(
-          tap((xhr: AjaxResponse) => {
+          tap((xhr) => {
             if (xhr.status !== 200) {
-              throw new Error(xhr.response);
+              throw new Error("Request failed");
             }
           }),
-          map((nb: AjaxResponse) => {
+          map((nb) => {
             return actions.publishToBookstoreAfterSave({
               contentRef: action.payload.contentRef,
               model: {
@@ -131,9 +131,9 @@ export function publishToBookstoreAfterSave(
 
       // Publish notebook to Bookstore
       return bookstore.publish(serverConfig, targetPath, model).pipe(
-        tap((xhr: AjaxResponse) => {
+        tap((xhr) => {
           if (xhr.status !== 200) {
-            throw new Error(xhr.response);
+            throw new Error(`Received unexpected ${xhr.status} status from request.`);
           }
         }),
         map(() => {

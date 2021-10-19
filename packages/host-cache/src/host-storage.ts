@@ -108,7 +108,7 @@ export class LocalHostStorage {
     return `${prefix}${JSON.stringify({ repo, ref, binderURL })}`;
   }
 
-  async checkUp(host: HostRecord): Promise<boolean> {
+  async checkUp(host: HostRecord): Promise<boolean | undefined> {
     if (host.type !== UP) {
       return false;
     }
@@ -171,6 +171,7 @@ export class LocalHostStorage {
       .toPromise();
 
     if (
+      !host ||
       !host.config ||
       !host.config.endpoint ||
       !host.config.token ||

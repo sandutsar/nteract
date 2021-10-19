@@ -212,7 +212,10 @@ export default class CodeMirrorEditor extends React.Component<
     try {
       await import(`codemirror/mode/${mode}/${mode}.js`);
     } catch (error) {
-      console.warn(`Unable to load ${mode} due to ${error.message}`);
+      if (error instanceof Error)
+      {
+        console.warn(`Unable to load ${mode} due to ${error.message}`);
+      }
     }
 
     return mode;

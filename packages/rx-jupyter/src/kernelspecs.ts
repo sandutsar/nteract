@@ -2,6 +2,32 @@ import { Observable } from "rxjs";
 import { ajax, AjaxResponse } from "rxjs/ajax";
 import { ServerConfig } from "@nteract/types";
 import { createAJAXSettings } from "./base";
+import { KernelResponse } from "./kernels";
+
+export interface KernelSpecFileResponse
+{
+  language: string;
+  argv: string[];
+  display_name: string;
+  codemirror_mode: string;
+  env: { [name: string] : any };
+  metadata: { [name: string] : any };
+  interrupt_mode?: string | undefined;
+}
+
+export interface KernelspecResponse 
+{
+  name: string;
+  resources: { [name: string] : any };
+  spec: KernelSpecFileResponse;
+
+}
+
+export interface ListKernelspecsResponse
+{
+  default: string;
+  kernelspecs: { [name: string] : KernelspecResponse };
+}
 
 /**
  * Creates an AjaxObservable for listing available kernelspecs.
@@ -10,8 +36,8 @@ import { createAJAXSettings } from "./base";
  *
  * @return An Observable with the request response
  */
-export const list = (serverConfig: ServerConfig): Observable<AjaxResponse> =>
-  ajax(createAJAXSettings(serverConfig, "/api/kernelspecs", { cache: false }));
+export const list = (serverConfig: ServerConfig) =>
+  ajax<ListKernelspecsResponse>(createAJAXSettings(serverConfig, "/api/kernelspecs", { cache: false }));
 
 /**
  * Returns the specification of available kernels with the given
@@ -25,8 +51,8 @@ export const list = (serverConfig: ServerConfig): Observable<AjaxResponse> =>
 export const get = (
   serverConfig: ServerConfig,
   name: string
-): Observable<AjaxResponse> =>
-  ajax(
+) =>
+  ajax<KernelspecResponse>(
     createAJAXSettings(serverConfig, `/api/kernelspecs/${name}`, {
       cache: false
     })

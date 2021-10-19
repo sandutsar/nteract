@@ -7,6 +7,15 @@ import { webSocket } from "rxjs/webSocket";
 import urljoin from "url-join";
 import { createAJAXSettings } from "./base";
 
+export interface KernelResponse
+{
+  id: string;
+  name: string;
+  last_activity: string;
+  connections: number;
+  execution_state: string;
+}
+
 /**
  * Creates an AjaxObservable for listing running kernels.
  *
@@ -15,7 +24,7 @@ import { createAJAXSettings } from "./base";
  * @returns An Observable with the request response
  */
 export const list = (serverConfig: ServerConfig) =>
-  ajax(createAJAXSettings(serverConfig, "/api/kernels", { cache: false }));
+  ajax<Array<KernelResponse>>(createAJAXSettings(serverConfig, "/api/kernels", { cache: false }));
 
 /**
  * Creates an AjaxObservable for getting info about a kernel.
@@ -42,7 +51,7 @@ export const get = (serverConfig: ServerConfig, id: string) =>
  * @returns An Observable with the request response
  */
 export const start = (serverConfig: ServerConfig, name: string, path: string) =>
-  ajax(
+  ajax<KernelResponse>(
     createAJAXSettings(serverConfig, "/api/kernels", {
       headers: {
         "Content-Type": "application/json"

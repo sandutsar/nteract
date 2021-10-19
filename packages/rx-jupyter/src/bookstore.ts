@@ -9,6 +9,12 @@ import { createAJAXSettings } from "./base";
 
 const formURI = (path: string) => urljoin("/api/bookstore/publish", path);
 
+export interface BookstoreResponse
+{
+  s3_path: string;
+  versionID: string;
+}
+
 /**
  * Creates an AjaxObservable for publishing content to `Bookstore`
  * https://github.com/nteract/bookstore
@@ -23,7 +29,7 @@ export function publish(
   serverConfig: ServerConfig,
   path: string,
   model: BookstoreDataModel
-): Observable<AjaxResponse> {
+): Observable<AjaxResponse<BookstoreResponse>> {
   return ajax(
     createAJAXSettings(serverConfig, formURI(path), {
       body: model,

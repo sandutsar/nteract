@@ -7,6 +7,11 @@ import { createAJAXSettings, normalizeBaseURL } from "./base";
 
 const formURI = (path: string) => urljoin("/api/terminals/", path);
 
+export interface TerminalResponse {
+  name: string;
+  last_activity: string;
+}
+
 /**
  * List all available running terminals.
  *
@@ -14,7 +19,7 @@ const formURI = (path: string) => urljoin("/api/terminals/", path);
  *
  * @returns An Observable with the request response
  */
-export const list = (serverConfig: ServerConfig): Observable<AjaxResponse> =>
+export const list = (serverConfig: ServerConfig): Observable<AjaxResponse<TerminalResponse>> =>
   ajax(
     createAJAXSettings(serverConfig, "/api/terminals/", {
       method: "GET"
@@ -28,7 +33,7 @@ export const list = (serverConfig: ServerConfig): Observable<AjaxResponse> =>
  *
  * @return An Observable with the request response
  */
-export const create = (serverConfig: ServerConfig): Observable<AjaxResponse> =>
+export const create = (serverConfig: ServerConfig): Observable<AjaxResponse<TerminalResponse>> =>
   ajax(
     createAJAXSettings(serverConfig, "/api/terminals/", {
       method: "POST"
@@ -46,7 +51,7 @@ export const create = (serverConfig: ServerConfig): Observable<AjaxResponse> =>
 export const get = (
   serverConfig: ServerConfig,
   id: string
-): Observable<AjaxResponse> =>
+): Observable<AjaxResponse<TerminalResponse>> =>
   ajax(
     createAJAXSettings(serverConfig, formURI(id), {
       method: "GET"
@@ -64,7 +69,7 @@ export const get = (
 export const destroy = (
   serverConfig: ServerConfig,
   id: string
-): Observable<AjaxResponse> =>
+): Observable<AjaxResponse<void>> =>
   ajax(
     createAJAXSettings(serverConfig, formURI(id), {
       method: "DELETE"

@@ -33,7 +33,7 @@ export function updateContentEpic(
         .pipe(
           tap(xhr => {
             if (xhr.status !== 200) {
-              throw new Error(xhr.response);
+              throw new Error(`Received unexpected ${xhr.status} status from request.`);
             }
           }),
           map(() => {
@@ -321,12 +321,12 @@ export function saveContentEpic(
           return dependencies.contentProvider
             .save(serverConfig, filepath, saveModel)
             .pipe(
-              mergeMap((saveXhr: AjaxResponse) => {
-                if (saveXhr.response.errno) {
+              mergeMap((saveXhr) => {
+                if (saveXhr.status != 200 && saveXhr.status != 201) {
                   return of(
                     actions.saveFailed({
                       contentRef: action.payload.contentRef,
-                      error: saveXhr.response
+                      error: new Error("Could not save file")
                     })
                   );
                 }
@@ -445,7 +445,7 @@ export function saveAsContentEpic(
       return dependencies.contentProvider
         .save(serverConfig, filepath, saveModel)
         .pipe(
-          mergeMap((xhr: AjaxResponse) => {
+          mergeMap((xhr) => {
             return of(
               actions.changeFilename({
                 contentRef: action.payload.contentRef,
