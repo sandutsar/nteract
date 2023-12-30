@@ -21,7 +21,7 @@ export class Pagers extends React.PureComponent<ComponentProps & StateProps> {
     return (
       <div className="nteract-cell-pagers">
         {pagers.map(pager => (
-          <RichMedia data={pager.data} metadata={pager.metadata}>
+          <RichMedia data={pager} metadata={{}}>
             {React.Children.map(this.props.children, child => {
               if (
                 typeof child === "string" ||

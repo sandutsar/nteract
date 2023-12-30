@@ -32,7 +32,8 @@ import {
   ImmutableRawCell,
   makeCodeCell,
   makeMarkdownCell,
-  makeRawCell
+  makeRawCell,
+  MarkdownCellParams
 } from "./cells";
 import {
   createImmutableOutput,
@@ -45,6 +46,7 @@ import {
   demultiline,
   ExecutionCount,
   JSONObject,
+  MimeBundle,
   MultiLineString,
   remultiline
 } from "./primitives";
@@ -70,6 +72,7 @@ export interface CodeCell {
 }
 
 export interface MarkdownCell {
+  attachments?: { [filename: string]: MimeBundle<MultiLineString> }
   cell_type: "markdown";
   id?: string;
   metadata: JSONObject;
@@ -114,6 +117,24 @@ function createImmutableMetadata(metadata: JSONObject): ImmutableMap<any, any> {
   });
 }
 
+function createImmutableAttachments(attachments: MarkdownCell["attachments"]): MarkdownCellParams["attachments"]
+{
+  if (!attachments)
+  {
+    return undefined
+  }
+
+  return ImmutableMap(attachments).map((bundle) => {
+    for (const mime_type in bundle) {
+      if (bundle.hasOwnProperty(mime_type))
+      {
+        bundle[mime_type] = demultiline(bundle[mime_type]);
+      }
+    }
+    return bundle as MimeBundle<string>;
+  })
+}
+
 function createImmutableRawCell(cell: RawCell): ImmutableRawCell {
   return makeRawCell({
     cell_type: cell.cell_type,
@@ -126,6 +147,7 @@ function createImmutableMarkdownCell(
   cell: MarkdownCell
 ): ImmutableMarkdownCell {
   return makeMarkdownCell({
+    attachments: createImmutableAttachments(cell.attachments),
     cell_type: cell.cell_type,
     source: demultiline(cell.source),
     metadata: createImmutableMetadata(cell.metadata)
@@ -213,6 +235,11 @@ function metadataToJS(immMetadata: ImmutableMap<string, any>): JSONObject {
   return immMetadata.toJS() as JSONObject;
 }
 
+function attachmentsToJS(immAttachments: ImmutableMap<string, MimeBundle<string>> | undefined): MarkdownCell["attachments"]
+{
+  return immAttachments?.toJS() as MarkdownCell["attachments"]
+}
+
 export function outputToJS(output: ImmutableOutput): OnDiskOutput {
   switch (output.output_type) {
     case "execute_result":
@@ -251,6 +278,7 @@ export function outputToJS(output: ImmutableOutput): OnDiskOutput {
 
 function markdownCellToJS(immCell: ImmutableMarkdownCell): MarkdownCell {
   return {
+    attachments: attachmentsToJS(immCell.attachments),
     cell_type: "markdown",
     source: remultiline(immCell.source),
     metadata: metadataToJS(immCell.metadata)

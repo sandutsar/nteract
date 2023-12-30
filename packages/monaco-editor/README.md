@@ -93,6 +93,9 @@ The CSS can be imported in a top level React component simply by doing:
 import "@nteract/styles/monaco/overrides.css";
 ```
 
+Note that the CSS styles overrides monaco editor's built-in styles, so in certain cases the display of editor may look a bit off,  for example, after resizing, the content inside the editor won't refresh until user click into the editor to force a re-layout in the focused editor.
+An alternative performance tweak is to batch the layout changes of all editors in one execution task, so it avoid multiple DOM  thrashing, to do that, just simply set both properties `batchLayoutChanges` and `shouldUpdateLayoutWhenNotFocused` to true.
+
 ## Support
 
 If you experience an issue while using this package or have a feature request, please file an issue on the [issue board](https://github.com/nteract/nteract/issues/new/choose) and add the `pkg:monaco-editor` label.

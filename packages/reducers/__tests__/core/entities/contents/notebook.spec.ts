@@ -5,9 +5,11 @@ import {
   emptyCodeCell,
   emptyMarkdownCell,
   emptyNotebook,
+  makeCodeCell,
   makeDisplayData,
   makeErrorOutput,
   makeExecuteResult,
+  makeMarkdownCell,
   makeStreamOutput,
 } from "@nteract/commutable";
 import * as Immutable from "immutable";
@@ -480,6 +482,19 @@ describe("createCellBelow", () => {
     const cell = state.getIn(["notebook", "cellMap", cellId]);
     expect(cell.get("cell_type")).toBe("markdown");
   });
+  test("creates new cell given cell contents with line endings normalized to LF", () => {
+    const originalState = monocellDocument;
+    const id = originalState.getIn(["notebook", "cellOrder"]).last();
+    const state = reducers(
+      originalState,
+      actions.createCellBelow({ cellType: "markdown", id, cell: makeMarkdownCell({ source: "line1\nline2\r\nline3\r\n" })})
+    );
+    expect(state.getIn(["notebook", "cellOrder"]).size).toBe(4);
+    const cellId = state.getIn(["notebook", "cellOrder"]).last();
+    const cell = state.getIn(["notebook", "cellMap", cellId]);
+    expect(cell.get("cell_type")).toBe("markdown");
+    expect(cell.get("source")).toEqual("line1\nline2\nline3\n")
+  });
 });
 
 describe("createCellAbove", () => {
@@ -498,12 +513,24 @@ describe("createCellAbove", () => {
     const id = originalState.getIn(["notebook", "cellOrder"]).last();
     const state = reducers(
       originalState,
-      actions.createCellAbove({ cellType: "markdown", id, cell: emptyMarkdownCell.set("source", "test contents") })
+      actions.createCellAbove({ cellType: "markdown", id, cell: makeMarkdownCell({ source: "test contents" })})
     );
     expect(state.getIn(["notebook", "cellOrder"]).size).toBe(3);
     expect(state.getIn(["notebook", "cellOrder"]).last()).toBe(id);
     const insertedCellId = state.getIn(["notebook", "cellOrder", 1]);
     expect(state.getIn(["notebook", "cellMap", insertedCellId, "source"])).toEqual("test contents")
+  })
+  test("creates new cell given cell contents with line endings normalized to LF", () => {
+    const originalState = initialDocument.set("notebook", fixtureCommutable);
+    const id = originalState.getIn(["notebook", "cellOrder"]).last();
+    const state = reducers(
+      originalState,
+      actions.createCellAbove({ cellType: "markdown", id, cell: makeMarkdownCell({ source: "line1\nline2\r\nline3\r\n" })})
+    );
+    expect(state.getIn(["notebook", "cellOrder"]).size).toBe(3);
+    expect(state.getIn(["notebook", "cellOrder"]).last()).toBe(id);
+    const insertedCellId = state.getIn(["notebook", "cellOrder", 1]);
+    expect(state.getIn(["notebook", "cellMap", insertedCellId, "source"])).toEqual("line1\nline2\nline3\n")
   })
 });
 
@@ -515,6 +542,26 @@ describe("newCellAppend", () => {
       actions.createCellAppend({ cellType: "code" })
     );
     expect(state.getIn(["notebook", "cellOrder"]).size).toBe(3);
+  });
+  test("appends a new cell at the end given cell contents", () => {
+    const originalState = initialDocument.set("notebook", fixtureCommutable);
+    const state = reducers(
+      originalState,
+      actions.createCellAppend({ cellType: "code", cell: makeCodeCell({ source: "test contents" })})
+    );
+    expect(state.getIn(["notebook", "cellOrder"]).size).toBe(3);
+    const insertedCellId = state.getIn(["notebook", "cellOrder"]).last();
+    expect(state.getIn(["notebook", "cellMap", insertedCellId, "source"])).toEqual("test contents")
+  });
+  test("appends a new cell at the end given cell contents with line endings normalized to LF", () => {
+    const originalState = initialDocument.set("notebook", fixtureCommutable);
+    const state = reducers(
+      originalState,
+      actions.createCellAppend({ cellType: "code", cell: makeCodeCell({ source: "line1\nline2\r\nline3\r\n" })})
+    );
+    expect(state.getIn(["notebook", "cellOrder"]).size).toBe(3);
+    const insertedCellId = state.getIn(["notebook", "cellOrder"]).last();
+    expect(state.getIn(["notebook", "cellMap", insertedCellId, "source"])).toEqual("line1\nline2\nline3\n")
   });
 });
 
@@ -529,6 +576,18 @@ describe("updateSource", () => {
     );
     expect(state.getIn(["notebook", "cellMap", id, "source"])).toBe(
       "This is a test"
+    );
+  });
+  test("normalizes the line endings to LF for cell source updates", () => {
+    const originalState = initialDocument.set("notebook", fixtureCommutable);
+
+    const id = originalState.getIn(["notebook", "cellOrder"]).first();
+    const state = reducers(
+      originalState,
+      actions.setInCell({ id, path: ["source"], value: "line1\nline2\r\nline3\r\n" })
+    );
+    expect(state.getIn(["notebook", "cellMap", id, "source"])).toBe(
+      "line1\nline2\nline3\n"
     );
   });
 });
@@ -664,7 +723,7 @@ describe("copyCell", () => {
       notebook: Immutable.fromJS({
         cellOrder: [firstId, secondId, thirdId],
         cellMap: {
-          [firstId]: emptyCodeCell.set("source", "data"),
+          [firstId]: makeCodeCell({ source: "data" }),
           [secondId]: emptyCodeCell,
           [thirdId]: emptyCodeCell,
         },
@@ -675,13 +734,13 @@ describe("copyCell", () => {
 
     const state = reducers(originalState, actions.copyCell({ id: firstId }));
 
-    expect(state.get("copied")).toEqual(emptyCodeCell.set("source", "data"));
+    expect(state.get("copied")).toEqual(makeCodeCell({ source: "data" }));
 
     expect(state.get("notebook")).toEqual(
       Immutable.fromJS({
         cellOrder: [firstId, secondId, thirdId],
         cellMap: {
-          [firstId]: emptyCodeCell.set("source", "data"),
+          [firstId]: makeCodeCell({ source: "data" }),
           [secondId]: emptyCodeCell,
           [thirdId]: emptyCodeCell,
         },
@@ -700,7 +759,7 @@ describe("cutCell", () => {
       notebook: Immutable.fromJS({
         cellOrder: [firstId, secondId, thirdId],
         cellMap: {
-          [firstId]: emptyCodeCell.set("source", "data"),
+          [firstId]: makeCodeCell({ source: "data" }),
           [secondId]: emptyCodeCell,
           [thirdId]: emptyCodeCell,
         },
@@ -711,7 +770,7 @@ describe("cutCell", () => {
 
     const state = reducers(originalState, actions.cutCell({ id: firstId }));
 
-    expect(state.get("copied")).toEqual(emptyCodeCell.set("source", "data"));
+    expect(state.get("copied")).toEqual(makeCodeCell({ source: "data" }));
     expect(state.getIn(["notebook", "cellMap", firstId])).toBeUndefined();
   });
 });
@@ -732,7 +791,7 @@ describe("pasteCell", () => {
         },
       }),
       cellFocused: secondId,
-      copied: emptyCodeCell.set("source", "COPY PASTA"),
+      copied: makeCodeCell({ source: "COPY PASTA" }),
     });
 
     // We will paste the cell after the focused cell
@@ -741,7 +800,7 @@ describe("pasteCell", () => {
     // The third cell should be our copied cell
     const newCellId = state.getIn(["notebook", "cellOrder", 2]);
     expect(state.getIn(["notebook", "cellMap", newCellId])).toEqual(
-      emptyCodeCell.set("source", "COPY PASTA")
+      makeCodeCell({ source: "COPY PASTA" })
     );
 
     expect(state.getIn(["notebook", "cellOrder"])).toEqual(

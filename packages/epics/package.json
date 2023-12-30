@@ -1,6 +1,6 @@
 {
   "name": "@nteract/epics",
-  "version": "5.0.11",
+  "version": "5.1.0",
   "description": "Redux-Observable epics for nteract apps",
   "keywords": [
     "jupyter",

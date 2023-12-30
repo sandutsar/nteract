@@ -1,4 +1,4 @@
-import { findIndex } from "lodash";
+import findIndex from "lodash/findIndex";
 import { of } from "rxjs";
 import { configOption } from "../index";
 import { configuration } from "../package";

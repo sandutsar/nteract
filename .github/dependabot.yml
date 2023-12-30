@@ -6,4 +6,4 @@ updates:
       interval: "weekly"
     versioning-strategy: increase-if-necessary
     commit-message:
-      - prefix: "chore"
+      prefix: "chore"

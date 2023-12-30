@@ -1,19 +1,9 @@
-import * as monaco from "monaco-editor";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { Observable, Observer } from "rxjs";
 import { first, map } from "rxjs/operators";
-import {
-  childOf,
-  JupyterMessage,
-  ofMessageType,
-  Channels,
-} from "@nteract/messaging";
+import { childOf, JupyterMessage, ofMessageType, Channels } from "@nteract/messaging";
 
-import {
-  CompletionResults,
-  CompletionMatch,
-  completionRequest,
-  js_idx_to_char_idx,
-} from "../editor-base";
+import { CompletionResults, CompletionMatch, completionRequest, js_idx_to_char_idx } from "../editor-base";
 
 /**
  * Jupyter to Monaco completion item kinds.
@@ -27,19 +17,18 @@ const jupyterToMonacoCompletionItemKind: {
   function: monaco.languages.CompletionItemKind.Function,
   keyword: monaco.languages.CompletionItemKind.Keyword,
   instance: monaco.languages.CompletionItemKind.Variable,
-  statement: monaco.languages.CompletionItemKind.Variable,
+  statement: monaco.languages.CompletionItemKind.Variable
 };
 
 /**
  * Completion item provider.
  */
-class CompletionItemProvider
-  implements monaco.languages.CompletionItemProvider {
+class CompletionItemProvider implements monaco.languages.CompletionItemProvider {
   private channels: Channels | undefined;
+  private regexWhitespace = new RegExp(/^\s*$/);
 
   /**
    * Set Channels of Jupyter kernel.
-   * @param channels Channels of Jupyter kernel.
    */
   setChannels(channels: Channels | undefined) {
     this.channels = channels;
@@ -54,20 +43,17 @@ class CompletionItemProvider
 
   /**
    * Additional characters to trigger completion other than Ctrl+Space.
+   * We do not need any additional characters to trigger completion as the Monaco editor
+   * by default triggers completion as the user types non-whitespace characters.
    */
   get triggerCharacters() {
-    return [" ", "<", "/", ".", "="];
+    return [];
   }
 
   /**
    * Get list of completion items at position of cursor.
-   * @param model Monaco editor text model.
-   * @param position Position of cursor.
    */
-  async provideCompletionItems(
-    model: monaco.editor.ITextModel,
-    position: monaco.Position
-  ) {
+  async provideCompletionItems(model: monaco.editor.ITextModel, position: monaco.Position) {
     // Convert to zero-based index
     let cursorPos = model.getOffsetAt(position);
     const code = model.getValue();
@@ -78,11 +64,7 @@ class CompletionItemProvider
     if (this.channels) {
       try {
         const message = completionRequest(code, cursorPos);
-        items = await this.codeCompleteObservable(
-          this.channels,
-          message,
-          model
-        ).toPromise();
+        items = await this.codeCompleteObservable(this.channels, message, model).toPromise();
       } catch (error) {
         // tslint:disable-next-line
         console.error(error);
@@ -91,21 +73,14 @@ class CompletionItemProvider
 
     return Promise.resolve<monaco.languages.CompletionList>({
       suggestions: items,
-      incomplete: false,
+      incomplete: false
     });
   }
 
   /**
    * Get list of completion items from Jupyter kernel.
-   * @param channels Channels of Jupyter kernel.
-   * @param message Jupyter message for completion request.
-   * @param model Text model.
    */
-  private codeCompleteObservable(
-    channels: Channels,
-    message: JupyterMessage,
-    model: monaco.editor.ITextModel
-  ) {
+  private codeCompleteObservable(channels: Channels, message: JupyterMessage, model: monaco.editor.ITextModel) {
     // Process completion response
     const completion$ = channels.pipe(
       childOf(message),
@@ -126,193 +101,200 @@ class CompletionItemProvider
   /**
    * Converts Jupyter completion result to list of Monaco completion items.
    */
-  private adaptToMonacoCompletions(
-    results: CompletionResults,
-    model: monaco.editor.ITextModel
-  ) {
-    let range: monaco.IRange;
-    let percentCount = 0;
-    let matches = results ? results.matches : [];
+  private adaptToMonacoCompletions(results: CompletionResults, model: monaco.editor.ITextModel) {
+    // Get completion list from Jupyter
+    let completionItems = results.matches ?? [];
     if (results.metadata && results.metadata._jupyter_types_experimental) {
-      matches = results.metadata._jupyter_types_experimental;
+      completionItems = results.metadata._jupyter_types_experimental;
     }
 
-    // retrieve the text that is currently typed out which is used to determine completion
+    // Retrieve the text that is currently typed out which is used to determine completion
     const startPos = model.getPositionAt(results.cursor_start);
     const endPos = model.getPositionAt(results.cursor_end);
-    const context = model.getValueInRange(
-      {
-        startLineNumber: startPos.lineNumber,
-        startColumn: startPos.column,
-        endLineNumber: endPos.lineNumber,
-        endColumn: endPos.column
-      });
+    const typedText = model.getValueInRange({
+      startLineNumber: startPos.lineNumber,
+      startColumn: startPos.column,
+      endLineNumber: endPos.lineNumber,
+      endColumn: endPos.column
+    });
 
-    return matches.map((match: CompletionMatch, index: number) => {
-      if (typeof match === "string") {
-        const text = this.sanitizeText(match, context);
-        const inserted = this.getInsertText(text, context);
-        const filtered = this.getFilterText(text, context);
-        return {
-          kind: this.adaptToMonacoCompletionItemKind(unknownJupyterKind),
-          label: text,
-          insertText: inserted,
-          filterText: filtered,
-          sortText: this.getSortText(index),
-        } as monaco.languages.CompletionItem;
-      } else {
-        // We only need to get the range once as the range is the same for all completion items in the list.
-        if (!range) {
-          const start = model.getPositionAt(match.start);
-          const end = model.getPositionAt(match.end);
-          range = {
-            startLineNumber: start.lineNumber,
-            startColumn: start.column,
-            endLineNumber: end.lineNumber,
-            endColumn: end.column,
-          };
+    const typedMagicPrefix = this.getMagicPrefix(typedText);
+    const isWhitespaceFromCellStart = this.isWhitespaceFromCellStart(model, startPos);
 
-          // Get the range representing the text before the completion action was invoked.
-          // If the text starts with magics % indicator, we need to track how many of these indicators exist
-          // so that we ensure the insertion text only inserts the delta between what the user typed versus
-          // what is recommended by the completion. Without this, there will be extra % insertions.
-          // Example:
-          // User types %%p then suggestion list will recommend %%python, if we now commit the item then the
-          // final text in the editor becomes %%p%%python instead of %%python. This is why the tracking code
-          // below is needed. This behavior is only specific to the magics % indicators as Monaco does not
-          // handle % characters in their completion list well.
-          const rangeText = model.getValueInRange(range);
-          if (rangeText.startsWith("%%")) {
-            percentCount = 2;
-          } else if (rangeText.startsWith("%")) {
-            percentCount = 1;
-          }
+    return completionItems
+      .map((completionItem: CompletionMatch, index: number) => {
+        let completionText, completionKind;
+        if (typeof completionItem === "string") {
+          completionText = completionItem;
+          completionKind = unknownJupyterKind;
+        } else {
+          completionText = completionItem.text;
+          completionKind = completionItem.type;
         }
 
-        const text = this.sanitizeText(match.text, context);
-        const filtered = this.getFilterText(text, context);
-        const inserted = this.getInsertText(text, context, percentCount);
-        return {
-          kind: this.adaptToMonacoCompletionItemKind(match.type),
-          label: text,
-          insertText: inserted,
-          filterText: filtered,
-          sortText: this.getSortText(index),
+        completionText = this.sanitizeText(completionText, typedText);
+
+        let item: monaco.languages.CompletionItem | undefined = {
+          kind: this.adaptToMonacoCompletionItemKind(completionKind),
+          label: completionText,
+          insertText: this.getInsertText(completionText, typedText, typedMagicPrefix),
+          filterText: this.getFilterText(completionText, typedText),
+          sortText: this.getSortText(index)
         } as monaco.languages.CompletionItem;
-      }
+
+        const completionMagicPrefix = this.getMagicPrefix(completionText);
+        if (completionMagicPrefix === "%%") {
+          if (!isWhitespaceFromCellStart || startPos.column !== 1) {
+            // Cell magic is not valid if there are non-whitespace from cell start to current position
+            // or if it is not on the first column of a line.
+            item = undefined;
+          }
+        } else if (completionMagicPrefix === "%") {
+          if (startPos.column !== 1) {
+            // Line magic is not valid if it is not on the first column of a line.
+            item = undefined;
+          }
+        }        
+        return item;
+      })
+      .filter((item) => item !== undefined);
+  }
+    
+  /**
+   * Get magic prefix from text.
+   */
+  private getMagicPrefix(text: string) {
+    if(text.startsWith("%")) {
+      return text.startsWith("%%") ? "%%" : "%"; 
+    } else {
+      return undefined;
+    }
+  }
+
+  /**
+   * Whether all characters from cell start position up to current start position are whitespace.
+   */
+  private isWhitespaceFromCellStart(model: monaco.editor.ITextModel, startPos: monaco.Position) {
+    const beforeText = model.getValueInRange({
+      startLineNumber: 1,
+      startColumn: 1,
+      endLineNumber: startPos.lineNumber,
+      endColumn: startPos.column
     });
+    return this.regexWhitespace.test(beforeText);
   }
 
   /**
    * Converts Jupyter completion item kind to Monaco completion item kind.
-   * @param kind Jupyter completion item kind.
    */
   private adaptToMonacoCompletionItemKind(kind: string) {
     const result = jupyterToMonacoCompletionItemKind[kind];
-    return result
-      ? result
-      : jupyterToMonacoCompletionItemKind[unknownJupyterKind];
+    return result ? result : jupyterToMonacoCompletionItemKind[unknownJupyterKind];
   }
 
   /**
-   * Removes problematic prefixes based on the context.
-   * 
+   * Removes problematic prefixes based on the typed text.
+   *
    * Instead of showing "some/path" we should only show "path". For paths with white space, the kernel returns
    * ""some/path with spaces"" which we want to change to ""path with spaces"".
-   * 
+   *
    * Additionally, typing "[]." should not suggest ".append" since this results in "[]..append".
-   * 
-   * @param text Text of Jupyter completion item
    */
-  private sanitizeText(text: string, context: string) {
+  private sanitizeText(completionText: string, typedText: string) {
     // Assumption: if the current context contains a "/" then we're currently typing a path
-    const isPathCompletion = context.includes("/");
+    const isPathCompletion = typedText.includes("/");
     if (isPathCompletion) {
       // If we have whitespace within a path, the completion for it is a string wrapped in double quotes
       // We should return only the last part of the path, wrapped in double quotes
-      const completionIsPathWithWhitespace = text.startsWith('"') && text.endsWith('"') && text.length > 2; // sanity check: not empty string
-      if (completionIsPathWithWhitespace && text.substr(1).startsWith(context)) { // sanity check: the context is part of the suggested path
-        const toRemove = context.substr(0, context.lastIndexOf("/") + 1);
-        return `"${text.substr(toRemove.length+1)}`;
+      const completionIsPathWithWhitespace =
+        completionText.startsWith('"') && completionText.endsWith('"') && completionText.length > 2; // sanity check: not empty string
+      if (completionIsPathWithWhitespace && completionText.substr(1).startsWith(typedText)) {
+        // sanity check: the context is part of the suggested path
+        const toRemove = typedText.substr(0, typedText.lastIndexOf("/") + 1);
+        return `"${completionText.substr(toRemove.length + 1)}`;
       }
 
       // Otherwise, display the most specific item in the path
-      if (text.startsWith(context)) { // sanity check: the context is part of the suggested path
-        const toRemove = context.substr(0, context.lastIndexOf("/") + 1);
-        return text.substr(toRemove.length);
+      if (completionText.startsWith(typedText)) {
+        // sanity check: the context is part of the suggested path
+        const toRemove = typedText.substr(0, typedText.lastIndexOf("/") + 1);
+        return completionText.substr(toRemove.length);
       }
     }
 
     // Handle "." after paths, since those might contain "." as well. Note that we deal with this somewhat
     // generically, but also take a somewhat conservative approach by ensuring that the completion starts with the
     // current context to ensure that we aren't applying this when we shouldn't
-    const isMemberCompletion = context.endsWith(".");
-    if (isMemberCompletion && text.startsWith(context)) {
-      const toRemove = context.substr(0, context.lastIndexOf(".") + 1);
-      return text.substr(toRemove.length);
+    const isMemberCompletion = typedText.endsWith(".");
+    if (isMemberCompletion && completionText.startsWith(typedText)) {
+      const toRemove = typedText.substr(0, typedText.lastIndexOf(".") + 1);
+      return completionText.substr(toRemove.length);
     }
 
-    // Handle taking only the suggestion content after the last dot. There are cases that a kernel when given 
-    // "suggestion1.itemA" text and typing "." that it will suggest the full path of "suggestion.itemA.itemB" instead of 
-    // just "itemB". The logic below handles these cases. This also handles the case where given "suggestion1.itemA.it" 
-    // text and typing "e" will suggest the full path of "suggestion.itemA.itemB" instead of "itemB". 
+    // Handle taking only the suggestion content after the last dot. There are cases that a kernel when given
+    // "suggestion1.itemA" text and typing "." that it will suggest the full path of "suggestion.itemA.itemB" instead of
+    // just "itemB". The logic below handles these cases. This also handles the case where given "suggestion1.itemA.it"
+    // text and typing "e" will suggest the full path of "suggestion.itemA.itemB" instead of "itemB".
     // This logic also covers that scenario.
-    const index = text.lastIndexOf(".");
-    if (index > -1 && index < text.length - 1) {
-      return text.substring(index + 1);
+    const index = completionText.lastIndexOf(".");
+    if (index > -1 && index < completionText.length - 1) {
+      return completionText.substring(index + 1);
     }
 
-    return text;
+    return completionText;
   }
 
   /**
    * Remove magics all % characters as Monaco doesn't like them for the filtering text.
    * Without this, completion won't show magics match items.
-   * 
+   *
    * Also remove quotes from the filter of a path wrapped in quotes to make sure we have
    * a smooth auto-complete experience.
-   * 
-   * @param text Text of Jupyter completion item.
    */
-  private getFilterText(text: string, context: string) {
-    const isPathCompletion = context.includes("/");
+  private getFilterText(completionText: string, typedText: string) {
+    const isPathCompletion = typedText.includes("/");
     if (isPathCompletion) {
-      const completionIsPathWithWhitespace = text.startsWith('"') && text.endsWith('"') && text.length > 2; // sanity check: not empty string
-      if (completionIsPathWithWhitespace && text.substr(1).startsWith(context)) { // sanity check: the context is part of the suggested path
-        return text.substr(1, text.length-1);
+      const completionIsPathWithWhitespace =
+        completionText.startsWith('"') && completionText.endsWith('"') && completionText.length > 2; // sanity check: not empty string
+      if (completionIsPathWithWhitespace && completionText.substr(1).startsWith(typedText)) {
+        // sanity check: the context is part of the suggested path
+        return completionText.substr(1, completionText.length - 1);
       }
     }
-    return text.replace(/%/g, "");
+    return completionText.replace(/%/g, "");
   }
 
   /**
    * Get insertion text handling what to insert for the magics case depending on what
    * has already been typed. Also handles an edge case for file paths with "." in the name.
-   * @param text Text of Jupyter completion item.
-   * @param percentCount Number of percent characters to remove
    */
-  private getInsertText(text: string, context: string, percentCount: number = 0) {
+  private getInsertText(completionText: string, typedText: string, typedMagicPrefix?: string) {
     // There is an edge case for folders that have "." in the name. The default range for replacements is determined
     // by the "current word" but that doesn't allow "." in the string, so if you autocomplete "some." for a string
     // like "some.folder.name" you end up with "some.some.folder.name".
-    const isPathCompletion = context.includes("/");
-    const isPathWithPeriodInName = isPathCompletion && text.includes(".") && context.includes(".");
+    const isPathCompletion = typedText.includes("/");
+    const isPathWithPeriodInName = isPathCompletion && completionText.includes(".") && typedText.includes(".");
     if (isPathWithPeriodInName) {
       // The text in our sanitization step has already been filtered to only include the most specific path but
       // our context includes the full thing, so we need to determine the substring in the most specific path.
       // This is then used to figure out what we should actually insert.
       // example 1: context = "a/path/to/some." and text = "some.folder.name" should produce "folder.name"
       // example 2: context = "a/path/to/some.fo" and text = "some.folder.name" should still produce "folder.name"
-      const completionContext = context.substr(context.lastIndexOf("/") + 1);
-      if (text.startsWith(completionContext)) { // sanity check: the paths match
-        return text.substr(completionContext.lastIndexOf(".") + 1);
+      const completionContext = typedText.substr(typedText.lastIndexOf("/") + 1);
+      if (completionText.startsWith(completionContext)) {
+        // sanity check: the paths match
+        return completionText.substr(completionContext.lastIndexOf(".") + 1);
       }
     }
 
-    for (let i = 0; i < percentCount; i++) {
-      text = text.replace("%", "");
-    }
-    return text;
+    // If the typed text starts with magics % indicator, we need to inserts the delta between what the user 
+    // typed versus what is recommended by the completion. Without this, there will be extra % insertions.
+    // Example:
+    // User types %%p then suggestion list will recommend %%python, if we now commit the item then the
+    // final text in the editor becomes %%p%%python instead of %%python. This is why the tracking code
+    // below is needed. This behavior is only specific to the magics % indicators as Monaco does not
+    // handle % characters in their completion list well.
+    return typedMagicPrefix ? completionText.replace(typedMagicPrefix, "") : completionText;
   }
 
   /**

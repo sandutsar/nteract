@@ -1,6 +1,6 @@
 {
   "name": "@nteract/connected-components",
-  "version": "6.8.12",
+  "version": "6.9.0",
   "description": "Connected components exported from @nteract/core",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

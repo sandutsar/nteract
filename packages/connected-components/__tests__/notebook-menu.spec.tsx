@@ -35,6 +35,7 @@ describe("PureNotebookMenu", () => {
       const {
         DOWNLOAD_NOTEBOOK,
         EXECUTE_ALL_CELLS,
+        EXECUTE_ALL_CELLS_ABOVE,
         EXECUTE_ALL_CELLS_BELOW,
         UNHIDE_ALL,
         CLEAR_ALL_OUTPUTS,
@@ -59,6 +60,7 @@ describe("PureNotebookMenu", () => {
         // action functions
         executeCell: jest.fn(),
         executeAllCells: jest.fn(),
+        executeAllCellsAbove: jest.fn(),
         executeAllCellsBelow: jest.fn(),
         unhideAll: jest.fn(),
         clearAllOutputs: jest.fn(),
@@ -98,6 +100,16 @@ describe("PureNotebookMenu", () => {
       executeAllCellsItem.simulate("click", eventMock);
       expect(props.executeAllCells).toHaveBeenCalledTimes(1);
       expect(props.executeAllCells).toHaveBeenCalledWith({
+        contentRef: props.currentContentRef
+      });
+
+      const executeAllCellsAboveItem = wrapper.find({
+        text: EXECUTE_ALL_CELLS_ABOVE
+      });
+      expect(props.executeAllCellsAbove).not.toHaveBeenCalled();
+      executeAllCellsAboveItem.simulate("click", eventMock);
+      expect(props.executeAllCellsAbove).toHaveBeenCalledTimes(1);
+      expect(props.executeAllCellsAbove).toHaveBeenCalledWith({
         contentRef: props.currentContentRef
       });
 

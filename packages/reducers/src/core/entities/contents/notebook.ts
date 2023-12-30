@@ -5,6 +5,7 @@ import {
   createFrozenMediaBundle,
   createImmutableOutput,
   deleteCell,
+  demultiline,
   emptyCodeCell,
   emptyMarkdownCell,
   emptyNotebook,
@@ -19,6 +20,7 @@ import {
   makeRawCell,
   markCellDeleting,
   markCellNotDeleting,
+  normalizeLineEndings,
   OnDiskDisplayData,
   OnDiskExecuteResult,
   OnDiskOutput,
@@ -543,8 +545,7 @@ function createCellAppend(
   const { cellType } = action.payload;
   const notebook: ImmutableNotebook = state.get("notebook");
   const cellOrder: List<CellId> = notebook.get("cellOrder", List());
-  const cell: ImmutableCell =
-    cellType === "markdown" ? emptyMarkdownCell : emptyCodeCell;
+  const cell: ImmutableCell = action.payload.cell ?? (cellType === "markdown" ? emptyMarkdownCell : emptyCodeCell);
   const index = cellOrder.count();
   const cellId = uuid();
   return state.set("notebook", insertCellAt(notebook, cell, cellId, index));
@@ -566,7 +567,7 @@ function acceptPayloadMessage(
     if (payload.replace) {
       // this payload is sent in IPython when you use %load
       // and is intended to replace cell source
-      return state.setIn(["notebook", "cellMap", id, "source"], payload.text);
+      return state.setIn(["notebook", "cellMap", id, "source"], normalizeLineEndings(payload.text));
     } else {
       // create the next cell
       // FIXME: This is a weird pattern. We're basically faking a dispatch here
@@ -576,7 +577,7 @@ function acceptPayloadMessage(
         type: actionTypes.CREATE_CELL_BELOW,
         payload: {
           cellType: "code",
-          cell: emptyCodeCell.setIn("source", payload.text || ""),
+          cell: makeCodeCell({ source: payload.text || "" }),
           id,
           contentRef: action.payload.contentRef,
         },
@@ -591,10 +592,14 @@ function setInCell(
   state: NotebookModel,
   action: actionTypes.SetInCell<string>
 ): RecordOf<DocumentRecordProps> {
-  return state.setIn(
-    ["notebook", "cellMap", action.payload.id].concat(action.payload.path),
-    action.payload.value
-  );
+  const { id, path } = action.payload;
+  let value = action.payload.value;
+
+  if (path.length === 1 && path[0] === "source") {
+    value = normalizeLineEndings(demultiline(value)) ?? "";
+  }
+
+  return state.setIn(["notebook", "cellMap", id].concat(path), value);
 }
 
 function toggleCellOutputVisibility(

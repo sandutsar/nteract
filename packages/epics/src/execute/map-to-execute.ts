@@ -15,7 +15,7 @@ import * as selectors from "@nteract/selectors";
 import { AppState, KernelStatus, errors } from "@nteract/types";
 
 /**
- * Maps ExecuteAllCells and ExecuteAllCellsBelow actions to
+ * Maps ExecuteAllCells, ExecuteAllCellsAbove, and ExecuteAllCellsBelow actions to
  * ExecuteCell actions. These ExecuteCell actions are mapped
  * to SendExecuteRequest actions by another epic.
  *
@@ -24,14 +24,14 @@ import { AppState, KernelStatus, errors } from "@nteract/types";
  */
 export function executeAllCellsEpic(
   action$: Observable<
-    actions.ExecuteAllCells | actions.ExecuteAllCellsBelow
+    actions.ExecuteAllCells | actions.ExecuteAllCellsAbove | actions.ExecuteAllCellsBelow
   >,
   state$: StateObservable<AppState>
 ) {
   return action$.pipe(
-    ofType(actions.EXECUTE_ALL_CELLS, actions.EXECUTE_ALL_CELLS_BELOW),
+    ofType(actions.EXECUTE_ALL_CELLS, actions.EXECUTE_ALL_CELLS_ABOVE, actions.EXECUTE_ALL_CELLS_BELOW),
     concatMap(
-      (action: actions.ExecuteAllCells | actions.ExecuteAllCellsBelow) => {
+      (action: actions.ExecuteAllCells | actions.ExecuteAllCellsAbove | actions.ExecuteAllCellsBelow) => {
         const state = state$.value;
         const contentRef = action.payload.contentRef;
 
@@ -53,8 +53,10 @@ export function executeAllCellsEpic(
 
         if (action.type === actions.EXECUTE_ALL_CELLS) {
           codeCellIds = selectors.notebook.codeCellIds(model);
+        } else if (action.type === actions.EXECUTE_ALL_CELLS_ABOVE) {
+          codeCellIds = selectors.notebook.codeCellIdsAbove(model, action.payload.id);
         } else if (action.type === actions.EXECUTE_ALL_CELLS_BELOW) {
-          codeCellIds = selectors.notebook.codeCellIdsBelow(model);
+          codeCellIds = selectors.notebook.codeCellIdsBelow(model, action.payload.id);
         }
         return of(
           ...codeCellIds.map((id: CellId) =>

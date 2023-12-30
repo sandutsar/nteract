@@ -1,4 +1,4 @@
-import { fromJS, isNotebookV3 } from "../src/v3";
+import { CodeCell, NotebookV3, fromJS, isNotebookV3 } from "../src/v3";
 
 describe("isNotebookV3", () => {
   it("returns true for nbformat v3 notebooks", () => {
@@ -153,5 +153,36 @@ describe("fromJS", () => {
     };
     const result = fromJS(notebook);
     expect(result.cellOrder.size).toBe(9);
+  });
+
+  const getCell = (source: string): CodeCell => {
+    return {
+      cell_type: "code",
+      collapsed: false,
+      input: [source],
+      language: "python",
+      metadata: {},
+      outputs: [],
+      prompt_number: 7
+    };
+  };
+
+  it("normalizes line endings to LF for all cell sources", () => {
+    const notebook: NotebookV3 = { 
+      worksheets: [{
+        cells: [
+          getCell("line1\nline2\r\nline3\r\n"),
+          getCell("line1\r\nline2\r\nline3\n")
+        ],
+        metadata: {}
+      }],
+      metadata: {},
+      nbformat: 3,
+      nbformat_minor: 0
+    };
+
+    const out = fromJS(notebook);
+    expect(out.cellMap.get(out.cellOrder.get(0))?.source).toEqual("line1\nline2\nline3\n");
+    expect(out.cellMap.get(out.cellOrder.get(1))?.source).toEqual("line1\nline2\nline3\n");
   });
 });

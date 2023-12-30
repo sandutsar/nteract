@@ -1,5 +1,9 @@
 import * as React from "react";
-import * as Monaco from "monaco-editor";
+import * as Monaco from "monaco-editor/esm/vs/editor/editor.api";
+
+import ResizeObserver from "../src/polyfill/windowResizeEventObserver";
+global.ResizeObserver = ResizeObserver;
+
 import { default as MonacoEditor } from "../src/MonacoEditor";
 import { mount } from "enzyme";
 
@@ -12,7 +16,7 @@ const monacoEditorCommonProps = {
   value: "test_value",
   enableCompletion: true,
   language: "python",
-  onCursorPositionChange: () => {},
+  onCursorPositionChange: () => {}
 };
 
 describe("MonacoEditor component is rendering correctly", () => {
@@ -38,29 +42,34 @@ const mockEditor = {
   onDidFocusEditorText: jest.fn(),
   onDidBlurEditorText: jest.fn(),
   onDidChangeCursorSelection: jest.fn(),
+  onDidFocusEditorWidget: jest.fn(),
   onDidBlurEditorWidget: jest.fn(),
   onMouseMove: jest.fn(),
   updateOptions: jest.fn(),
   getValue: jest.fn(),
   setValue: jest.fn(),
   getConfiguration: jest.fn(),
+  getContainerDomNode: jest.fn(() => ({ clientWidth: 100, clientHeight: 50 })),
   layout: jest.fn(),
   getModel: jest.fn(),
   getSelection: jest.fn(),
   focus: jest.fn(),
   hasTextFocus: jest.fn(),
+  hasWidgetFocus: jest.fn(),
   addCommand: jest.fn(),
-  changeViewZones: jest.fn(),
+  changeViewZones: jest.fn()
 };
 
 const mockEditorModel = {
-  updateOptions: jest.fn(),
+  setEOL: jest.fn(),
+  updateOptions: jest.fn()
 };
 const mockCreateEditor = jest.fn().mockReturnValue(mockEditor);
 Monaco.editor.create = mockCreateEditor;
 Monaco.editor.createModel = jest.fn().mockReturnValue(mockEditorModel);
-MonacoEditor.prototype.calculateHeight = jest.fn();
+MonacoEditor.prototype.requestLayout = jest.fn();
 MonacoEditor.prototype.registerDefaultCompletionProvider = jest.fn();
+MonacoEditor.prototype.getLayoutDimension = jest.fn(() => ({ width: 300, height: 400 }));
 
 describe("MonacoEditor default completion provider", () => {
   beforeAll(() => {
@@ -82,9 +91,7 @@ describe("MonacoEditor default completion provider", () => {
       />
     );
     expect(mockCreateEditor).toHaveBeenCalledTimes(1);
-    expect(
-      MonacoEditor.prototype.registerDefaultCompletionProvider
-    ).toHaveBeenCalledTimes(1);
+    expect(MonacoEditor.prototype.registerDefaultCompletionProvider).toHaveBeenCalledTimes(1);
   });
 
   it("Should not call registerDefaultCompletionProvider method when registerCompletionUsingDefault is set to false", () => {
@@ -100,9 +107,7 @@ describe("MonacoEditor default completion provider", () => {
       />
     );
     expect(mockCreateEditor).toHaveBeenCalledTimes(1);
-    expect(
-      MonacoEditor.prototype.registerDefaultCompletionProvider
-    ).toHaveBeenCalledTimes(0);
+    expect(MonacoEditor.prototype.registerDefaultCompletionProvider).toHaveBeenCalledTimes(0);
   });
 });
 
@@ -113,7 +118,7 @@ describe("MonacoEditor lifeCycle methods set up", () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
-  it("Should call calculateHeight method before rendering editor", () => {
+  it("Should call requestLayout method before rendering editor", () => {
     mount(
       <MonacoEditor
         {...monacoEditorCommonProps}
@@ -124,11 +129,14 @@ describe("MonacoEditor lifeCycle methods set up", () => {
       />
     );
     expect(mockCreateEditor).toHaveBeenCalledTimes(1);
-    expect(MonacoEditor.prototype.calculateHeight).toHaveBeenCalledTimes(1);
+    expect(MonacoEditor.prototype.requestLayout).toHaveBeenCalledTimes(1);
   });
 
-  it("Should set editor's focus on render if editorFocused prop is set and editor does not have focus", () => {
-    mockEditor.hasTextFocus = jest.fn().mockReturnValue(false);
+  it("Should set editor's focus on render if editorFocused prop is set and editor text or widget does not have focus", () => {
+    mockEditor.hasWidgetFocus = jest.fn().mockReturnValue(false);
+    // hasWidgetFocus() would return false in the following case:
+    // 1. The editor text and editor widget(s) both do not have focus
+    // Since, neither an editor widget nor the editor text have focus, we explicitly set editor's focus.
     mount(
       <MonacoEditor
         {...monacoEditorCommonProps}
@@ -142,8 +150,12 @@ describe("MonacoEditor lifeCycle methods set up", () => {
     expect(mockEditor.focus).toHaveBeenCalledTimes(1);
   });
 
-  it("Should not set editor's focus on render if editorFocused prop is set but editor already has focus", () => {
-    mockEditor.hasTextFocus = jest.fn().mockReturnValue(true);
+  it("Should not set editor's focus on render if editorFocused prop is set but editor text or a widget already has focus", () => {
+    mockEditor.hasWidgetFocus = jest.fn().mockReturnValue(true);
+    // hasWidgetFocus() would return true in the following cases:
+    // 1. Editor text has focus i.e. cursor blink
+    // 2. An editor widget has focus i.e. context menu, command palette
+    // In both the scenarios we want to preserve the editor focus state and not steal the focus from a widget
     mount(
       <MonacoEditor
         {...monacoEditorCommonProps}
@@ -173,31 +185,36 @@ describe("MonacoEditor lifeCycle methods set up", () => {
 
   it("Should call editor setValue when value prop has changed on componentDidUpdate.", () => {
     mockEditor.setValue = jest.fn();
-    const editorWrapper = mount(
-      <MonacoEditor
-        {...monacoEditorCommonProps}
-        value="initial_value"
-      />
-    );
+    const editorWrapper = mount(<MonacoEditor {...monacoEditorCommonProps} value="initial_value" />);
     editorWrapper.setProps({ value: "different_value" });
 
-    // We expect setValue is called twice. First on componentDidMount and second on componentDidUpdate 
+    // We expect setValue is called twice. First on componentDidMount and second on componentDidUpdate
     // when the props.value has new different value.
-    expect(mockEditor.setValue).toHaveBeenCalledTimes(2);
+    expect(mockEditor.setValue).toHaveBeenCalledTimes(1);
   });
 
   it("Should not call editor setValue when value prop has not changed on componentDidUpdate.", () => {
     mockEditor.setValue = jest.fn();
-    const editorWrapper = mount(
+    const editorWrapper = mount(<MonacoEditor {...monacoEditorCommonProps} value="initial_value" />);
+    editorWrapper.setProps({ value: "initial_value" });
+
+    // We expect setValue is called once on componentDidMount when the props.value does not have different value.
+    expect(mockEditor.setValue).toHaveBeenCalledTimes(0);
+  });
+
+  it("Should call setEOL when creating editor", () => {
+    mount(
       <MonacoEditor
         {...monacoEditorCommonProps}
-        value="initial_value"
+        channels={undefined}
+        onChange={jest.fn()}
+        onFocusChange={jest.fn()}
+        editorFocused={true}
       />
     );
-    editorWrapper.setProps({ value: "initial_value" });
-    
-    // We expect setValue is called once on componentDidMount when the props.value does not have different value.
-    expect(mockEditor.setValue).toHaveBeenCalledTimes(1);
+    expect(Monaco.editor.createModel).toHaveBeenCalledTimes(1);
+    expect(Monaco.editor.create).toHaveBeenCalledTimes(1);
+    expect(mockEditorModel.setEOL).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -242,102 +259,5 @@ describe("MonacoEditor lineNumbers configuration", () => {
     const editorCreateArgs = mockCreateEditor.mock.calls[0][1];
     expect(editorCreateArgs).toHaveProperty("lineNumbers");
     expect(editorCreateArgs.lineNumbers).toEqual("off");
-  });
-});
-
-describe("MonacoEditor resize handler when window size changes", () => {
-  beforeAll(() => {
-    jest.clearAllMocks();
-  });
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-  it("Should not call resize handler at all when window is not resized", () => {
-    // Create a new editor instance with the mock layout
-    const mockEditorLayout = jest.fn();
-    const newMockEditor = {...mockEditor};
-    newMockEditor.layout = mockEditorLayout;
-    mockCreateEditor.mockReturnValue(newMockEditor);
-    // We spy on the resize handler calls without changing the implementation
-    const resizeHandlerSpy = jest.spyOn(MonacoEditor.prototype, "resize");
-
-    mount(
-      <MonacoEditor
-        {...monacoEditorCommonProps}
-        channels={undefined}
-        onChange={jest.fn()}
-        onFocusChange={jest.fn()}
-        editorFocused={false}
-      />
-    );
-
-    expect(mockCreateEditor).toHaveBeenCalledTimes(1);
-    // Resize handler should be called
-    expect(resizeHandlerSpy).toHaveBeenCalledTimes(0);
-    // editor.layout should not be called
-    expect(mockEditorLayout).toHaveBeenCalledTimes(0);
-
-    // Restore spy
-    resizeHandlerSpy.mockRestore();
-  });
-
-  it("Resize handler should not trigger editor.layout when it is not focused", () => {
-    // This is a perf optimization to reduce layout calls for unfocussed editors
-
-    // Create a new editor instance with the mock layout
-    const mockEditorLayout = jest.fn();
-    const newMockEditor = {...mockEditor};
-    newMockEditor.layout = mockEditorLayout;
-    mockCreateEditor.mockReturnValue(newMockEditor);
-    // We spy on the resize handler calls without changing the implementation
-    const resizeHandlerSpy = jest.spyOn(MonacoEditor.prototype, "resize");
-
-    mount(
-      <MonacoEditor
-        {...monacoEditorCommonProps}
-        channels={undefined}
-        onChange={jest.fn()}
-        onFocusChange={jest.fn()}
-        editorFocused={false}
-      />
-    );
-    (window as any).innerWidth = 500;
-    window.dispatchEvent(new Event('resize'));
-
-    // Resize handler should be called
-    expect(resizeHandlerSpy).toHaveBeenCalledTimes(1);
-    // editor.layout should not be called
-    expect(mockEditorLayout).toHaveBeenCalledTimes(0);
-
-    // Restore spy
-    resizeHandlerSpy.mockRestore();
-  });
-
-  it("Resize handler should trigger an editor.layout call for a focused editor", () => {
-    // Create a new editor instance with the mock layout
-    const mockEditorLayout = jest.fn();
-    const newMockEditor = {...mockEditor};
-    newMockEditor.layout = mockEditorLayout;
-    mockCreateEditor.mockReturnValue(newMockEditor);
-    // We spy on the resize handler calls without changing the implementation
-    const resizeHandlerSpy = jest.spyOn(MonacoEditor.prototype, "resize");;
-
-    mount(
-      <MonacoEditor
-        {...monacoEditorCommonProps}
-        channels={undefined}
-        onChange={jest.fn()}
-        onFocusChange={jest.fn()}
-        editorFocused={true}
-      />
-    );
-    (window as any).innerWidth = 500;
-    window.dispatchEvent(new Event('resize'));
-
-    expect(resizeHandlerSpy).toHaveBeenCalledTimes(1);
-    expect(mockEditorLayout).toHaveBeenCalledTimes(1);
-
-    // Restore spy
-    resizeHandlerSpy.mockRestore();
   });
 });

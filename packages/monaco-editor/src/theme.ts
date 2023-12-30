@@ -1,4 +1,4 @@
-import * as monaco from "monaco-editor";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 /**
  * The default light theme with customized background
@@ -34,7 +34,7 @@ export const customMonacoDarkTheme: monaco.editor.IStandaloneThemeData = {
   inherit: true,
   rules: [],
   colors: {
-    "editor.background": "#111"
+    "editor.background": "#111111"
   }
 };
 

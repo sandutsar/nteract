@@ -1,6 +1,6 @@
 {
   "name": "@nteract/monaco-editor",
-  "version": "3.5.4",
+  "version": "5.0.7",
   "description": "A React component for the monaco editor, tailored for nteract",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -27,7 +27,7 @@
     "@nteract/core": "^15.0.0",
     "@nteract/messaging": "^7.0.19",
     "lodash.debounce": "^4.0.6",
-    "monaco-editor": "0.22.3",
+    "monaco-editor": "0.34.1",
     "rxjs": "^6.3.3"
   },
   "peerDependencies": {

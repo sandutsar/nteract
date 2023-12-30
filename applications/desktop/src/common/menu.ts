@@ -94,6 +94,7 @@ export const menu: MenuDefinition = [
     ["Change Cell Type to Text", commands.ChangeCellToText],
     [],
     ["Run All", commands.RunAll],
+    ["Run All Above", commands.RunAllAbove],
     ["Run All Below", commands.RunAllBelow],
     ["Clear All Outputs", commands.ClearAll],
     ["Unhide Input and Output in all Cells", commands.UnhideAll],

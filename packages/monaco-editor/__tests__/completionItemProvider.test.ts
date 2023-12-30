@@ -1,6 +1,6 @@
 import { createMessage, JupyterMessage } from "@nteract/messaging";
 import { Subject } from "rxjs";
-import * as Monaco from "monaco-editor";
+import * as Monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { completionProvider } from "../src/completions/completionItemProvider";
 import * as editorBase from "../src/editor-base";
 
@@ -32,7 +32,7 @@ describe("Completions should not get trigerred when channels/messages are missin
 
     completionProvider.provideCompletionItems(testModel, testPos).then((result) => {
       expect(result).toHaveProperty("suggestions");
-      expect(result.suggestions.length).toEqual(0);
+      expect(result.suggestions).toHaveLength(0);
       done();
     });
   });
@@ -44,7 +44,7 @@ describe("Completions should not get trigerred when channels/messages are missin
 
     completionProvider.provideCompletionItems(testModel, testPos).then((result) => {
       expect(result).toHaveProperty("suggestions");
-      expect(result.suggestions.length).toEqual(0);
+      expect(result.suggestions).toHaveLength(0);
       done();
     });
     channels.complete();
@@ -58,7 +58,7 @@ describe("Completions should not get trigerred when channels/messages are missin
 
     completionProvider.provideCompletionItems(testModel, testPos).then((result) => {
       expect(result).toHaveProperty("suggestions");
-      expect(result.suggestions.length).toEqual(0);
+      expect(result.suggestions).toHaveLength(0);
       done();
     });
     // No suggestions should be provided for incompatible message type
@@ -81,7 +81,7 @@ describe("Completions should not get trigerred when channels/messages are missin
 
     completionProvider.provideCompletionItems(testModel, testPos).then((result) => {
       expect(result).toHaveProperty("suggestions");
-      expect(result.suggestions.length).toEqual(0);
+      expect(result.suggestions).toHaveLength(0);
       done();
     });
     // Although we have a complete reply message, it is not the child of the appropriate complete_request message
@@ -113,7 +113,7 @@ describe("Appropriate completions should be provided", () => {
     completionProvider.provideCompletionItems(testModel, testPos).then((result) => {
       expect(result).toHaveProperty("suggestions");
       const returnedSuggestions = result.suggestions;
-      expect(returnedSuggestions.length).toEqual(1);
+      expect(returnedSuggestions).toHaveLength(1);
       expect(returnedSuggestions[0].kind).toEqual(Monaco.languages.CompletionItemKind.Field);
       expect(returnedSuggestions[0].insertText).toEqual("some_completion");
       done();
@@ -139,7 +139,7 @@ describe("Appropriate completions should be provided", () => {
     completionProvider.provideCompletionItems(testModel, testPos).then((result) => {
       expect(result).toHaveProperty("suggestions");
       const returnedSuggestions = result.suggestions;
-      expect(returnedSuggestions.length).toEqual(2);
+      expect(returnedSuggestions).toHaveLength(2);
       expect(returnedSuggestions[0].kind).toEqual(Monaco.languages.CompletionItemKind.Field);
       expect(returnedSuggestions[0].insertText).toEqual("completion1");
       expect(returnedSuggestions[1].kind).toEqual(Monaco.languages.CompletionItemKind.Field);
@@ -174,7 +174,7 @@ describe("Appropriate completions should be provided", () => {
     completionProvider.provideCompletionItems(testModel, testPos).then((result) => {
       expect(result).toHaveProperty("suggestions");
       const returnedSuggestions = result.suggestions;
-      expect(returnedSuggestions.length).toEqual(1);
+      expect(returnedSuggestions).toHaveLength(1);
       expect(returnedSuggestions[0].kind).toEqual(Monaco.languages.CompletionItemKind.Keyword);
       expect(returnedSuggestions[0].insertText).toEqual("some_completion");
       done();
@@ -202,7 +202,7 @@ describe("Appropriate completions should be provided", () => {
     completionProvider.provideCompletionItems(testModel, testPos).then((result) => {
       expect(result).toHaveProperty("suggestions");
       const returnedSuggestions = result.suggestions;
-      expect(returnedSuggestions.length).toEqual(1);
+      expect(returnedSuggestions).toHaveLength(1);
       expect(returnedSuggestions[0].kind).toEqual(Monaco.languages.CompletionItemKind.Field);
       expect(returnedSuggestions[0].insertText).toEqual("some_completion");
       done();
@@ -228,13 +228,122 @@ describe("Appropriate completions should be provided", () => {
     completionProvider.provideCompletionItems(testModel, testPos).then((result) => {
       expect(result).toHaveProperty("suggestions");
       const returnedSuggestions = result.suggestions;
-      expect(returnedSuggestions.length).toEqual(2);
+      expect(returnedSuggestions).toHaveLength(2);
       expect(returnedSuggestions[0].kind).toEqual(Monaco.languages.CompletionItemKind.Field);
       expect(returnedSuggestions[0].label).toEqual("itemB");
       expect(returnedSuggestions[0].insertText).toEqual("itemB");
       expect(returnedSuggestions[1].kind).toEqual(Monaco.languages.CompletionItemKind.Field);
       expect(returnedSuggestions[1].label).toEqual("itemC");
       expect(returnedSuggestions[1].insertText).toEqual("itemC");
+      done();
+    });
+    // Set the reply message on channels and complete the stream
+    channels.next(mockCompleteReply);
+    channels.complete();
+  });
+  
+  it("Should return suggestions containing cell and line magics when position is at start of cell", (done) => {
+    const model = Monaco.editor.createModel("%m", "python");
+    const position = new Monaco.Position(1, 3);
+    const mockCompleteReply = createMessage("complete_reply", {
+      content: {
+        status: "some_status",
+        cursor_start: 0,
+        cursor_end: 2,
+        matches: ["%%magic1", "%magic2"]
+      },
+      parent_header: mockCompletionRequest.header
+    });
+
+    const channels = new Subject<JupyterMessage>();
+    completionProvider.setChannels(channels);
+    completionProvider.provideCompletionItems(model, position).then((result) => {
+      expect(result).toHaveProperty("suggestions");
+      const returnedSuggestions = result.suggestions;
+      expect(returnedSuggestions).toHaveLength(2);
+      expect(returnedSuggestions[0].label).toEqual("%%magic1");
+      expect(returnedSuggestions[1].label).toEqual("%magic2");
+      done();
+    });
+    // Set the reply message on channels and complete the stream
+    channels.next(mockCompleteReply);
+    channels.complete();
+  });
+
+  it("Should return suggestions containing cell and line magics when position is at start of 2nd line with blank 1st line", (done) => {
+    const model = Monaco.editor.createModel("\n%m", "python");
+    const position = new Monaco.Position(2, 4);
+    const mockCompleteReply = createMessage("complete_reply", {
+      content: {
+        status: "some_status",
+        cursor_start: 1,
+        cursor_end: 3,
+        matches: ["%%magic1", "%magic2"]
+      },
+      parent_header: mockCompletionRequest.header
+    });
+
+    const channels = new Subject<JupyterMessage>();
+    completionProvider.setChannels(channels);
+    completionProvider.provideCompletionItems(model, position).then((result) => {
+      expect(result).toHaveProperty("suggestions");
+      const returnedSuggestions = result.suggestions;
+      expect(returnedSuggestions).toHaveLength(2);
+      expect(returnedSuggestions[0].label).toEqual("%%magic1");
+      expect(returnedSuggestions[1].label).toEqual("%magic2");
+      done();
+    });
+    // Set the reply message on channels and complete the stream
+    channels.next(mockCompleteReply);
+    channels.complete();
+  });
+
+  it("Should return suggestions containing line magic when position is at start of 2nd line with non-blank 1st line", (done) => {
+    const model = Monaco.editor.createModel("print()\n%m", "python");
+    const position = new Monaco.Position(9, 11);
+    const mockCompleteReply = createMessage("complete_reply", {
+      content: {
+        status: "some_status",
+        cursor_start: 8,
+        cursor_end: 10,
+        matches: ["%%magic1", "%magic2"]
+      },
+      parent_header: mockCompletionRequest.header
+    });
+
+    const channels = new Subject<JupyterMessage>();
+    completionProvider.setChannels(channels);
+    completionProvider.provideCompletionItems(model, position).then((result) => {
+      expect(result).toHaveProperty("suggestions");
+      const returnedSuggestions = result.suggestions;
+      expect(returnedSuggestions).toHaveLength(1);
+      expect(returnedSuggestions[0].label).toEqual("%magic2");
+      done();
+    });
+    // Set the reply message on channels and complete the stream
+    channels.next(mockCompleteReply);
+    channels.complete();
+  });
+
+  it("Should return suggestions not containing cell and line magics when content before position contains non-whitespace characters", (done) => {
+    const model = Monaco.editor.createModel("print() %m", "python");
+    const position = new Monaco.Position(9, 11);
+    const mockCompleteReply = createMessage("complete_reply", {
+      content: {
+        status: "some_status",
+        cursor_start: 8,
+        cursor_end: 10,
+        matches: ["%%magic1", "%magic2"]
+      },
+      parent_header: mockCompletionRequest.header
+    });
+
+    const channels = new Subject<JupyterMessage>();
+    completionProvider.setChannels(channels);
+    completionProvider.provideCompletionItems(model, position).then((result) => {
+      expect(result).toHaveProperty("suggestions");
+      const returnedSuggestions = result.suggestions;
+      expect(returnedSuggestions).toHaveLength(0);
       done();
     });
     // Set the reply message on channels and complete the stream

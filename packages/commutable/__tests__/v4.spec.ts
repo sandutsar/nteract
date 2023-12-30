@@ -41,6 +41,19 @@ describe("cellToJS", () => {
     expect(cellToJS(codeCell).cell_type).toBe("code");
     expect(cellToJS(markdownCell).cell_type).toBe("markdown");
   });
+  it("can create and convert a markdown cell with attachments", () => {
+    const markdownCell = createMarkdownCell({
+      attachments: Immutable.Map({
+        "4e9a85bc-16ff-4d09-a23d-b3f731a5cc16.jpg": {
+          "image/jpeg": 
+          "<base64-string>"
+        }
+      })
+    });
+    const markdownCellAsJs = cellToJS(markdownCell);
+    expect(markdownCellAsJs.attachments).toBeDefined();
+    expect(markdownCellAsJs.attachments).toHaveProperty(["4e9a85bc-16ff-4d09-a23d-b3f731a5cc16.jpg", "image/jpeg"], "<base64-string>");
+  })
 });
 
 describe("outputToJS", () => {
@@ -152,6 +165,27 @@ describe("cell ids", () => {
         initial
       );
     });
+    it("can read notebook containing a markdown cell with attachments", () => {
+      const sampleMarkdownCell = createMarkdownCell({
+        attachments: Immutable.Map({
+          "foo.gif": {
+            "image/gif": ["<mulitline-base64", "-string>"]
+          }
+        })
+      }).toJS();
+      const notebook = getNotebook({
+        cells: [
+          {
+            ...sampleMarkdownCell,
+            id: "markdown-test-cell"
+          }
+        ]
+      });
+      const immNotebook = fromJS(notebook);
+      const markdownCell = immNotebook.getIn(["cellMap", "markdown-test-cell"]).toJS();
+
+      expect(markdownCell).toHaveProperty(["attachments", "foo.gif", "image/gif"], "<mulitline-base64-string>");
+    });
   });
 
   describe("toJS", () => {
@@ -192,6 +226,31 @@ describe("cell ids", () => {
 
       const out = toJS(notebook);
       expect(out.cells[0].hasOwnProperty("id")).toBe(false);
+    });
+  });
+
+  describe("fromJS", () => {
+    const getCell = (id: string, source: string) => {
+      return {
+        id,
+        cell_type: "code",
+        execution_count: null,
+        source,
+        outputs: []
+      };
+    };
+
+    it("normalizes line endings to LF for all cell sources", () => {
+      const notebook = getNotebook({ 
+        cells: [
+          getCell("cell1", "line1\nline2\r\nline3\r\n"),
+          getCell("cell2", "line1\r\nline2\r\nline3\n")
+        ]
+      });
+
+      const out = fromJS(notebook);
+      expect(out.cellMap.get("cell1")?.source).toEqual("line1\nline2\nline3\n");
+      expect(out.cellMap.get("cell2")?.source).toEqual("line1\nline2\nline3\n");
     });
   });
 });

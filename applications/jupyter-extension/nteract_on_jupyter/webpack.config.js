@@ -77,6 +77,23 @@ module.exports = {
             }
           }
         ]
+      },
+      {
+        test: /\.js$/,
+        include: [
+          path.resolve(__dirname, '../../../node_modules/monaco-editor')
+        ],
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env'],
+            plugins: [
+              ["@babel/transform-runtime", {
+                "regenerator": true
+              }]
+            ]
+          }
+        }
       }
     ]
   },

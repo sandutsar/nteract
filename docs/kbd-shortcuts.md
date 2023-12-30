@@ -95,6 +95,7 @@ nteract recognizes changes and displays new keyboard shortcuts in the menu after
 | RestartAndRunAll |
 | RestartKernel |
 | RunAll |
+| RunAllAbove |
 | RunAllBelow |
 | Save |
 | SaveAs |

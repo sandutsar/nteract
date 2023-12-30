@@ -1,6 +1,6 @@
 {
   "name": "@nteract/reducers",
-  "version": "5.1.10",
+  "version": "5.1.13",
   "description": "A set of reducers for use in nteract applications",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

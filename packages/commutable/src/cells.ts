@@ -1,6 +1,6 @@
 import { ImmutableOutput } from "./outputs";
 
-import { ExecutionCount } from "./primitives";
+import { ExecutionCount, MimeBundle, normalizeLineEndings } from "./primitives";
 
 import {
   List as ImmutableList,
@@ -8,6 +8,17 @@ import {
   Record,
   RecordOf,
 } from "immutable";
+
+function normalizedSourceCellRecord<T extends { source?: string }>(recordFn: Record.Factory<T>): Record.Factory<T> {
+  // Transparently wrap the factory, but overwrite the source with its normalized value
+  function factory(this: ThisType<typeof recordFn>, ...args: Parameters<typeof recordFn>) {
+    const res = recordFn.apply(this, args);
+    return res.set("source", normalizeLineEndings(res.source));
+  };
+  factory.prototype = recordFn.prototype;
+  factory.displayName = recordFn.displayName;
+  return factory as Record.Factory<T>;
+}
 
 /* CodeCell Record Boilerplate */
 
@@ -21,7 +32,7 @@ export interface CodeCellParams {
   outputs: ImmutableList<ImmutableOutput>;
 }
 
-export const makeCodeCell = Record<CodeCellParams>({
+export const makeCodeCell = normalizedSourceCellRecord(Record<CodeCellParams>({
   cell_type: "code",
   execution_count: null,
   metadata: ImmutableMap({
@@ -37,20 +48,22 @@ export const makeCodeCell = Record<CodeCellParams>({
   }),
   source: "",
   outputs: ImmutableList(),
-});
+}));
 
 export type ImmutableCodeCell = RecordOf<CodeCellParams>;
 
 /* MarkdownCell Record Boilerplate */
 
 export interface MarkdownCellParams {
+  attachments?: ImmutableMap<string, MimeBundle<string>>;
   cell_type: "markdown";
   id?: string;
   source: string;
   metadata: ImmutableMap<string, any>;
 }
 
-export const makeMarkdownCell = Record<MarkdownCellParams>({
+export const makeMarkdownCell = normalizedSourceCellRecord(Record<MarkdownCellParams>({
+  attachments: undefined,
   cell_type: "markdown",
   metadata: ImmutableMap({
     nteract: ImmutableMap({
@@ -60,7 +73,7 @@ export const makeMarkdownCell = Record<MarkdownCellParams>({
     }),
   }),
   source: "",
-});
+}));
 
 export type ImmutableMarkdownCell = RecordOf<MarkdownCellParams>;
 
@@ -73,7 +86,7 @@ export interface RawCellParams {
   metadata: ImmutableMap<string, any>;
 }
 
-export const makeRawCell = Record<RawCellParams>({
+export const makeRawCell = normalizedSourceCellRecord(Record<RawCellParams>({
   cell_type: "raw",
   metadata: ImmutableMap({
     nteract: ImmutableMap({
@@ -83,7 +96,7 @@ export const makeRawCell = Record<RawCellParams>({
     }),
   }),
   source: "",
-});
+}));
 
 export type ImmutableRawCell = RecordOf<RawCellParams>;
 

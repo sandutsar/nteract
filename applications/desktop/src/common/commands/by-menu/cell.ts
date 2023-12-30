@@ -25,6 +25,14 @@ export const RunAll: DesktopCommand<ReqContent> = {
   makeAction: actions.executeAllCells,
 };
 
+export const RunAllAbove: DesktopCommand<ReqContent> = {
+  name: "RunAllAbove",
+  props: {
+    contentRef: "required",
+  },
+  makeAction: actions.executeAllCellsAbove,
+};
+
 export const RunAllBelow: DesktopCommand<ReqContent> = {
   name: "RunAllBelow",
   props: {

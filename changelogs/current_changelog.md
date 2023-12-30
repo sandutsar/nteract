@@ -30,6 +30,7 @@ Provide a bulleted list of bug fixes and a reference to the PR(s) containing the
 - Fixed mythic-configuration, allowing it to be imported in a browser setting ([Issue #5445](https://github.com/nteract/nteract/issues/5445))
 - Upgraded react-syntax-highlighter v^12.0.0 -> v^13.0.0 ([PR#5523](https://github.com/nteract/nteract/pull/5523))
 - Fixed outputToJS, no reformatting text in serializing stream output ([#5596](https://github.com/nteract/nteract/pull/5596))
+- Added logic inside `createCellAppend()` to handle passed-in `cell` parameter, which was previously being ignored. ([#5708](https://github.com/nteract/nteract/pull/5708))
 
 ## Core SDK Packages
 
@@ -56,6 +57,8 @@ Provide a bulleted list of breaking changes and a reference to the PR(s) contain
 #### New Features
 
 Provide a bulleted list of new features or improvements and a reference to the PR(s) containing these changes.
+
+- Add support for Markdown cell attachments ([PR#5694])(https://github.com/nteract/nteract/pull/5694)
 
 #### Bug Fixes
 
@@ -116,6 +119,7 @@ Provide a bulleted list of breaking changes and a reference to the PR(s) contain
 #### New Features
 
 Provide a bulleted list of new features or improvements and a reference to the PR(s) containing these changes.
+- Add support for multiple clients to be able to connect the same remote kernel. ([PR#5557](https://github.com/nteract/nteract/pull/5557))
 
 #### Bug Fixes
 

@@ -64,23 +64,51 @@ export const editorFocusedId = (
 ): CellId | null | undefined => model.editorFocused;
 
 /**
- * Returns a list of CellIds below the currently focused cell in a notebook.
+ * Returns a list of CellIds above the currently focused cell in a notebook or the given cell ID.
  *
  * @param   model   The notebook to extract the code cells from
+ * @param   cellId  The reference cell ID. Defaults to the currently focused cell
  *
- * @returns         The IDs of cells below the currently focused cell
+ * @returns         The IDs of cells above the reference cell
  */
-export const codeCellIdsBelow = (
-  model: NotebookModel
+export const codeCellIdsAbove = (
+  model: NotebookModel,
+  cellId = model.cellFocused
 ): Immutable.List<CellId> => {
-  const cellFocused = model.cellFocused;
-  if (!cellFocused) {
-    // NOTE: if there is no focused cell, this runs none of the cells
+  if (!cellId) {
+    // NOTE: if there is no reference cell, this runs none of the cells
     return Immutable.List<CellId>();
   }
   const cellOrder = model.notebook.get("cellOrder", Immutable.List<CellId>());
 
-  const index = cellOrder.indexOf(cellFocused);
+  const index = cellOrder.indexOf(cellId);
+  return cellOrder
+    .take(index)
+    .filter(
+      (id: string) =>
+        model.notebook.getIn(["cellMap", id, "cell_type"]) === "code"
+    );
+};
+
+/**
+ * Returns a list of CellIds below the currently focused cell in a notebook or the given cell ID.
+ *
+ * @param   model   The notebook to extract the code cells from
+ * @param   cellId  The reference cell ID. Defaults to the currently focused cell
+ *
+ * @returns         The IDs of cells below the reference cell
+ */
+export const codeCellIdsBelow = (
+  model: NotebookModel,
+  cellId = model.cellFocused
+): Immutable.List<CellId> => {
+  if (!cellId) {
+    // NOTE: if there is no reference cell, this runs none of the cells
+    return Immutable.List<CellId>();
+  }
+  const cellOrder = model.notebook.get("cellOrder", Immutable.List<CellId>());
+
+  const index = cellOrder.indexOf(cellId);
   return cellOrder
     .skip(index)
     .filter(

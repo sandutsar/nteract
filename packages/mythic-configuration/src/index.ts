@@ -1,5 +1,8 @@
 import { isImmutable, List } from "immutable";
-import { isEqual, result, set, unset } from "lodash";
+import isEqual from "lodash/isEqual";
+import result from "lodash/result";
+import set from "lodash/set";
+import unset from "lodash/unset";
 import { setConfigAtKey } from "./myths/set-config-at-key";
 import { configuration } from "./package";
 import { ConfigurationOption, ConfigurationOptionDefinition, ConfigurationOptionDeprecatedDefinition, HasPrivateConfigurationState } from "./types";
